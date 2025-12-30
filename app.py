@@ -12,7 +12,13 @@ st.set_page_config(
 )
 
 # -------------------------
-# Load CSS (book / mythical UI)
+# Session state for page turn
+# -------------------------
+if "sloka_index" not in st.session_state:
+    st.session_state.sloka_index = 0
+
+# -------------------------
+# Load CSS (temple / book UI)
 # -------------------------
 with open("assets/book.css", "r", encoding="utf-8") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -26,7 +32,10 @@ with open("data/gita_6_to_10.json", "r", encoding="utf-8") as f:
 # -------------------------
 # App title
 # -------------------------
-st.markdown("<h1 style='text-align:center;'>📘 భగవద్గీత</h1>", unsafe_allow_html=True)
+st.markdown(
+    "<h1 style='text-align:center;'>📘 భగవద్గీత</h1>",
+    unsafe_allow_html=True
+)
 
 # -------------------------
 # Chapter selection
@@ -40,14 +49,16 @@ chapter_key = st.selectbox(
 chapter = gita[chapter_key]
 slokas = chapter["slokas"]
 
-# -------------------------
-# Sloka selection
-# -------------------------
-sloka_key = st.selectbox(
-    "శ్లోకం ఎంచుకోండి",
-    sorted(slokas.keys(), key=int)
-)
+# Reset page when chapter changes
+if st.session_state.get("last_chapter") != chapter_key:
+    st.session_state.sloka_index = 0
+    st.session_state.last_chapter = chapter_key
 
+# -------------------------
+# Sloka navigation (book style)
+# -------------------------
+sloka_keys = sorted(slokas.keys(), key=int)
+sloka_key = sloka_keys[st.session_state.sloka_index]
 sloka_data = slokas[sloka_key]
 audio_path = sloka_data["audio"]
 
@@ -61,7 +72,7 @@ st.markdown(
 )
 
 # -------------------------
-# Telugu Meaning
+# Telugu meaning
 # -------------------------
 st.markdown("## 📖 తెలుగు అర్థం")
 st.write(sloka_data["telugu"])
@@ -73,7 +84,7 @@ st.markdown("## 📜 భావం")
 st.write(sloka_data["bhavam"])
 
 # -------------------------
-# Audio playback (for everyone)
+# Audio playback
 # -------------------------
 st.markdown("## 🔊 శ్రవణం")
 if os.path.exists(audio_path):
@@ -82,7 +93,32 @@ else:
     st.info("🔊 ఈ శ్లోకానికి రికార్డింగ్ ఇంకా అందుబాటులో లేదు.")
 
 # -------------------------
-# Admin section (upload MP3)
+# Page turn controls
+# -------------------------
+st.markdown("<hr>", unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns([1, 2, 1])
+
+with col1:
+    if st.button("⬅️ ముందు"):
+        if st.session_state.sloka_index > 0:
+            st.session_state.sloka_index -= 1
+            st.rerun()
+
+with col2:
+    st.markdown(
+        f"<p style='text-align:center;'>శ్లోకం {sloka_key} / {len(sloka_keys)}</p>",
+        unsafe_allow_html=True
+    )
+
+with col3:
+    if st.button("తర్వాత ➡️"):
+        if st.session_state.sloka_index < len(sloka_keys) - 1:
+            st.session_state.sloka_index += 1
+            st.rerun()
+
+# -------------------------
+# Admin section (MP3 upload)
 # -------------------------
 with st.expander("🔐 Admin (రికార్డింగ్ అప్లోడ్)"):
     admin_key = st.text_input("Admin Key", type="password")
@@ -101,5 +137,6 @@ with st.expander("🔐 Admin (రికార్డింగ్ అప్లో�
 
             st.success("✅ రికార్డింగ్ విజయవంతంగా సేవ్ చేయబడింది.")
             st.audio(audio_path)
+
     elif admin_key:
         st.error("❌ తప్పు Admin Key")
