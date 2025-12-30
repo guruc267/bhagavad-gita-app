@@ -1,9 +1,10 @@
 import streamlit as st
 import json
 import os
+import base64
 
 # -------------------------
-# Page config
+# Page config (MUST be first Streamlit call)
 # -------------------------
 st.set_page_config(
     page_title="భగవద్గీత",
@@ -12,7 +13,35 @@ st.set_page_config(
 )
 
 # -------------------------
-# Session state for page turn
+# Background image (Krishna / Peacock Feather)
+# -------------------------
+def add_bg_from_local(image_file):
+    with open(image_file, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode()
+
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background:
+              linear-gradient(
+                rgba(0,0,0,0.82),
+                rgba(0,0,0,0.82)
+              ),
+              url("data:image/png;base64,{encoded}");
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+add_bg_from_local("assets/krishna_bg.png")
+
+# -------------------------
+# Remember page state (page-turn)
 # -------------------------
 if "sloka_index" not in st.session_state:
     st.session_state.sloka_index = 0
@@ -30,7 +59,7 @@ with open("data/gita_6_to_10.json", "r", encoding="utf-8") as f:
     gita = json.load(f)
 
 # -------------------------
-# App title
+# App Title
 # -------------------------
 st.markdown(
     "<h1 style='text-align:center;'>📘 భగవద్గీత</h1>",
@@ -132,6 +161,7 @@ with st.expander("🔐 Admin (రికార్డింగ్ అప్లో�
         if uploaded_file is not None:
             os.makedirs(os.path.dirname(audio_path), exist_ok=True)
 
+            # Always save using path from JSON
             with open(audio_path, "wb") as f:
                 f.write(uploaded_file.read())
 
