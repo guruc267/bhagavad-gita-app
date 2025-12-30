@@ -3,19 +3,21 @@ import json
 import os
 import base64
 
-# -------------------------
+# -------------------------------------------------
 # Page config (MUST be first Streamlit call)
-# -------------------------
+# -------------------------------------------------
 st.set_page_config(
     page_title="భగవద్గీత",
     page_icon="📘",
     layout="centered"
 )
 
-# -------------------------
+# -------------------------------------------------
 # Background image (Krishna / Peacock Feather)
-# -------------------------
+# -------------------------------------------------
 def add_bg_from_local(image_file):
+    ext = image_file.split(".")[-1]
+
     with open(image_file, "rb") as f:
         encoded = base64.b64encode(f.read()).decode()
 
@@ -28,7 +30,7 @@ def add_bg_from_local(image_file):
                 rgba(0,0,0,0.82),
                 rgba(0,0,0,0.82)
               ),
-              url("data:image/png;base64,{encoded}");
+              url("data:image/{ext};base64,{encoded}");
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -38,92 +40,104 @@ def add_bg_from_local(image_file):
         unsafe_allow_html=True
     )
 
-add_bg_from_local("assets/krishna_bg.png")
+# 👉 Make sure this file exists
+add_bg_from_local("assets/krishna_bg.webp")
 
-# -------------------------
-# Remember page state (page-turn)
-# -------------------------
+# -------------------------------------------------
+# Session state (book-style page turning)
+# -------------------------------------------------
 if "sloka_index" not in st.session_state:
     st.session_state.sloka_index = 0
 
-# -------------------------
-# Load CSS (temple / book UI)
-# -------------------------
+if "last_chapter" not in st.session_state:
+    st.session_state.last_chapter = None
+
+# -------------------------------------------------
+# Load CSS (Temple / Book UI)
+# -------------------------------------------------
 with open("assets/book.css", "r", encoding="utf-8") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# -------------------------
-# Load Gita JSON
-# -------------------------
-with open("data/gita_6_to_10.json", "r", encoding="utf-8") as f:
-    gita = json.load(f)
+# -------------------------------------------------
+# Load Gita JSON files
+# -------------------------------------------------
+gita = {}
 
-# -------------------------
+with open("data/gita_6_to_10.json", "r", encoding="utf-8") as f:
+    gita.update(json.load(f))
+
+# If you keep Chapter 7 separate
+if os.path.exists("data/gita_7.json"):
+    with open("data/gita_7.json", "r", encoding="utf-8") as f:
+        gita.update(json.load(f))
+
+# -------------------------------------------------
 # App Title
-# -------------------------
+# -------------------------------------------------
 st.markdown(
     "<h1 style='text-align:center;'>📘 భగవద్గీత</h1>",
     unsafe_allow_html=True
 )
 
-# -------------------------
-# Chapter selection
-# -------------------------
+# -------------------------------------------------
+# Chapter Selection
+# -------------------------------------------------
 chapter_key = st.selectbox(
     "అధ్యాయం ఎంచుకోండి",
     sorted(gita.keys(), key=int),
     format_func=lambda x: f"{x}. {gita[x]['name']}"
 )
 
-chapter = gita[chapter_key]
-slokas = chapter["slokas"]
-
 # Reset page when chapter changes
-if st.session_state.get("last_chapter") != chapter_key:
+if st.session_state.last_chapter != chapter_key:
     st.session_state.sloka_index = 0
     st.session_state.last_chapter = chapter_key
 
-# -------------------------
-# Sloka navigation (book style)
-# -------------------------
+chapter = gita[chapter_key]
+slokas = chapter["slokas"]
+
+# -------------------------------------------------
+# Sloka navigation
+# -------------------------------------------------
 sloka_keys = sorted(slokas.keys(), key=int)
 sloka_key = sloka_keys[st.session_state.sloka_index]
 sloka_data = slokas[sloka_key]
-audio_path = sloka_data["audio"]
 
-# -------------------------
+audio_path = sloka_data.get("audio", "")
+
+# -------------------------------------------------
 # Display Slokam (Sanskrit)
-# -------------------------
+# -------------------------------------------------
 st.markdown("## 🕉️ శ్లోకం")
 st.markdown(
     f"<pre class='slokam-box'>{sloka_data['sanskrit']}</pre>",
     unsafe_allow_html=True
 )
 
-# -------------------------
-# Telugu meaning
-# -------------------------
+# -------------------------------------------------
+# Telugu Meaning
+# -------------------------------------------------
 st.markdown("## 📖 తెలుగు అర్థం")
 st.write(sloka_data["telugu"])
 
-# -------------------------
+# -------------------------------------------------
 # Bhavam
-# -------------------------
+# -------------------------------------------------
 st.markdown("## 📜 భావం")
 st.write(sloka_data["bhavam"])
 
-# -------------------------
-# Audio playback
-# -------------------------
+# -------------------------------------------------
+# Audio Playback
+# -------------------------------------------------
 st.markdown("## 🔊 శ్రవణం")
-if os.path.exists(audio_path):
+if audio_path and os.path.exists(audio_path):
     st.audio(audio_path)
 else:
     st.info("🔊 ఈ శ్లోకానికి రికార్డింగ్ ఇంకా అందుబాటులో లేదు.")
 
-# -------------------------
-# Page turn controls
-# -------------------------
+# -------------------------------------------------
+# Page Turn Controls (Book Feel)
+# -------------------------------------------------
 st.markdown("<hr>", unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -146,9 +160,9 @@ with col3:
             st.session_state.sloka_index += 1
             st.rerun()
 
-# -------------------------
-# Admin section (MP3 upload)
-# -------------------------
+# -------------------------------------------------
+# Admin Section (MP3 Upload)
+# -------------------------------------------------
 with st.expander("🔐 Admin (రికార్డింగ్ అప్లోడ్)"):
     admin_key = st.text_input("Admin Key", type="password")
 
@@ -158,15 +172,17 @@ with st.expander("🔐 Admin (రికార్డింగ్ అప్లో�
             type=["mp3"]
         )
 
-        if uploaded_file is not None:
-            os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+        if uploaded_file:
+            if audio_path:
+                os.makedirs(os.path.dirname(audio_path), exist_ok=True)
 
-            # Always save using path from JSON
-            with open(audio_path, "wb") as f:
-                f.write(uploaded_file.read())
+                with open(audio_path, "wb") as f:
+                    f.write(uploaded_file.read())
 
-            st.success("✅ రికార్డింగ్ విజయవంతంగా సేవ్ చేయబడింది.")
-            st.audio(audio_path)
+                st.success("✅ రికార్డింగ్ విజయవంతంగా సేవ్ చేయబడింది.")
+                st.audio(audio_path)
+            else:
+                st.error("❌ Audio path JSON లో లేదు.")
 
     elif admin_key:
         st.error("❌ తప్పు Admin Key")
